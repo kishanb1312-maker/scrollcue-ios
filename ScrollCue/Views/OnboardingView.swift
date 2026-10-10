@@ -25,6 +25,7 @@ struct OnboardingView: View {
             } label: {
                 Text(page < 2 ? "Continue" : "Start using ScrollCue")
                     .font(.headline)
+                    .foregroundStyle(.black)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
             .buttonStyle(.borderedProminent)
