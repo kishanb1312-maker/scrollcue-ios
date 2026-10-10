@@ -231,7 +231,7 @@ struct PrompterSettings: Codable, Equatable {
     var overlayOpacity: Double = 0.75
 
     // Dock
-    var dockItems: [DockItem] = DockItem.allCases
+    var dockItems: [DockItem] = DockItem.allCases.filter { $0 != .mode }
 
     // Library
     var showDemoScript: Bool = true

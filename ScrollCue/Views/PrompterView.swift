@@ -89,6 +89,8 @@ struct PrompterScreen: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .animation(.easeInOut(duration: 0.2), value: engine.countdown)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
@@ -155,7 +157,7 @@ struct PrompterScreen: View {
         let leftSet: [DockItem] = [.restart, .sentenceBack]
         let left = items.filter { leftSet.contains($0) }
         let right = items.filter { !leftSet.contains($0) }
-        return HStack(spacing: 4) {
+        return HStack(spacing: 2) {
             ForEach(left) { dockButton($0) }
             Spacer(minLength: 0)
             Button {
@@ -165,13 +167,14 @@ struct PrompterScreen: View {
                 Image(systemName: engine.isPlaying || engine.countdown != nil ? "pause.fill" : "play.fill")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.black)
-                    .frame(width: 60, height: 60)
+                    .frame(width: 58, height: 58)
                     .background(settings.highlightColor.color, in: Circle())
             }
             Spacer(minLength: 0)
             ForEach(right) { dockButton($0) }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
         .frame(height: 84)
         .background(.black.opacity(0.35))
         .opacity(dockFaded ? 0.3 : 1)
@@ -186,9 +189,10 @@ struct PrompterScreen: View {
             handle(item)
         } label: {
             Image(systemName: icon(for: item))
-                .font(.system(size: 19, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(isOn(item) ? settings.highlightColor.color : .white)
-                .frame(width: 40, height: 44)
+                .frame(minWidth: 26, maxWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityLabel(item.label)
     }
@@ -257,6 +261,9 @@ struct PrompterScreen: View {
         engine.onWordsSpoken = { [weak stats] n in stats?.addWords(n) }
         engine.onSessionEnded = { [weak stats] secs in stats?.addSession(seconds: secs) }
         engine.onMirrorCommand = { settingsStore.settings.mirrorHorizontal.toggle() }
+        if LaunchArgs.quick { showQuickSettings = true }
+        if LaunchArgs.video { videoMode = true }
+        if LaunchArgs.mirror { settingsStore.settings.mirrorHorizontal = true }
         if LaunchArgs.autoplay {
             settingsStore.settings.scrollMode = .constant
             settingsStore.settings.constantSpeed = 80

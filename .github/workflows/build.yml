@@ -14,6 +14,10 @@ jobs:
           LATEST=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
           sudo xcode-select -s "$LATEST"
           xcodebuild -version
+      - name: Voice-tracking logic tests
+        run: |
+          swiftc -O ScrollCue/Engine/ScriptTokens.swift ScrollCue/Engine/ScriptMatcher.swift Tests/MatcherTest.swift -o matcher-test
+          ./matcher-test
       - name: Build for device (unsigned)
         run: |
           set -o pipefail
@@ -52,6 +56,18 @@ jobs:
           xcrun simctl io "$UDID" screenshot shots/3-prompter-a.png
           sleep 4
           xcrun simctl io "$UDID" screenshot shots/4-prompter-b.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoQuick; sleep 5
+          xcrun simctl io "$UDID" screenshot shots/5-quick-settings.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoVideo; sleep 5
+          xcrun simctl io "$UDID" screenshot shots/6-video-mode.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoMirror; sleep 5
+          xcrun simctl io "$UDID" screenshot shots/7-mirrored.png
           # Still alive?
           xcrun simctl spawn "$UDID" launchctl list | grep -i scrollcue
           ALIVE=$?

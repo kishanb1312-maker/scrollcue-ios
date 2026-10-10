@@ -23,6 +23,9 @@ enum LaunchArgs {
     static let args = ProcessInfo.processInfo.arguments
     static var openDemo: Bool { args.contains("-demoPrompter") }
     static var autoplay: Bool { args.contains("-demoAutoplay") }
+    static var quick: Bool { args.contains("-demoQuick") }
+    static var video: Bool { args.contains("-demoVideo") }
+    static var mirror: Bool { args.contains("-demoMirror") }
     static var tab: Int { args.contains("-tabSettings") ? 1 : (args.contains("-tabStats") ? 2 : 0) }
 }
 

@@ -59,10 +59,7 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
     }
 
     private func setupController() {
-        guard AVPictureInPictureController.isPictureInPictureSupported() else {
-            lastError = "Picture in Picture isn't supported on this device."
-            return
-        }
+        guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
         let source = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: displayLayer, playbackDelegate: self)
         let c = AVPictureInPictureController(contentSource: source)
         c.delegate = self
@@ -83,7 +80,10 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
     }
 
     func toggle() {
-        guard let controller else { return }
+        guard let controller else {
+            lastError = "Picture in Picture isn't supported on this device."
+            return
+        }
         if controller.isPictureInPictureActive {
             controller.stopPictureInPicture()
         } else {
