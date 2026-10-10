@@ -16,7 +16,7 @@ jobs:
           xcodebuild -version
       - name: Voice-tracking logic tests
         run: |
-          swiftc -O ScrollCue/Engine/ScriptTokens.swift ScrollCue/Engine/ScriptMatcher.swift Tests/MatcherTest.swift -o matcher-test
+          swiftc -O ScrollCue/Engine/ScriptTokens.swift ScrollCue/Engine/ScriptMatcher.swift Tests/MatcherTest/main.swift -o matcher-test
           ./matcher-test
       - name: Build for device (unsigned)
         run: |

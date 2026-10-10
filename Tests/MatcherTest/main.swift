@@ -1,5 +1,5 @@
 // Logic test for voice tracking. Compiled on CI with:
-//   swiftc ScrollCue/Engine/ScriptTokens.swift ScrollCue/Engine/ScriptMatcher.swift Tests/MatcherTest.swift
+//   swiftc ScrollCue/Engine/ScriptTokens.swift ScrollCue/Engine/ScriptMatcher.swift Tests/MatcherTest/main.swift
 import Foundation
 
 let script = """
