@@ -19,12 +19,35 @@ enum AudioSession {
 
 /// Plays silence so iOS keeps the app alive (and the PiP prompter scrolling)
 /// while another app is in front.
-final class KeepAlive {
+final class KeepAlive: NSObject {
     static let shared = KeepAlive()
     private var engine: AVAudioEngine?
+    private var wanted = false
+
+    private override init() {
+        super.init()
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(interruption(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+        nc.addObserver(self, selector: #selector(mediaReset), name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    }
+
+    @objc private func interruption(_ note: Notification) {
+        guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.restartIfNeeded() }
+    }
+
+    @objc private func mediaReset() {
+        DispatchQueue.main.async {
+            guard self.wanted else { return }
+            self.engine = nil
+            self.start()
+        }
+    }
 
     func start() {
-        guard engine == nil else { return }
+        wanted = true
+        guard engine == nil else { restartIfNeeded(); return }
         AudioSession.activate()
         let engine = AVAudioEngine()
         let format = engine.outputNode.inputFormat(forBus: 0)
@@ -47,12 +70,15 @@ final class KeepAlive {
     }
 
     func stop() {
+        wanted = false
         engine?.stop()
         engine = nil
     }
 
+    /// Called after interruptions (e.g. the Camera app grabbing audio) and by a watchdog.
     func restartIfNeeded() {
-        guard let engine, !engine.isRunning else { return }
+        guard wanted, let engine, !engine.isRunning else { return }
+        AudioSession.activate()
         try? engine.start()
     }
 }

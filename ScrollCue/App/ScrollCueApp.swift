@@ -26,12 +26,15 @@ enum LaunchArgs {
     static var quick: Bool { args.contains("-demoQuick") }
     static var video: Bool { args.contains("-demoVideo") }
     static var mirror: Bool { args.contains("-demoMirror") }
+    static var unmirror: Bool { args.contains("-demoUnmirror") }
+    static var skipOnboarding: Bool { args.contains("-skipOnboarding") }
     static var tab: Int { args.contains("-tabSettings") ? 1 : (args.contains("-tabStats") ? 2 : 0) }
 }
 
 struct RootView: View {
     @EnvironmentObject var stats: StatsStore
     @State private var tab = LaunchArgs.tab
+    @AppStorage("scrollcue.onboarded") private var onboarded = false
 
     var body: some View {
         TabView(selection: $tab) {
@@ -53,6 +56,9 @@ struct RootView: View {
             }
         }
         .animation(.spring, value: stats.milestone)
+        .fullScreenCover(isPresented: Binding(get: { !onboarded && !LaunchArgs.skipOnboarding }, set: { _ in })) {
+            OnboardingView { onboarded = true }
+        }
     }
 }
 

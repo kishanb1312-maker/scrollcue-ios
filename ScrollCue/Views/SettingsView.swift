@@ -173,8 +173,24 @@ struct VoiceSettingsSection: View {
         } header: {
             Text("Voice")
         } footer: {
-            Text("Speech recognition runs on-device when your iPhone supports it for the language — nothing leaves the phone. Commands work in Voice mode while the prompter is playing.")
+            VStack(alignment: .leading, spacing: 6) {
+                Label(onDeviceText, systemImage: onDevice ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(onDevice ? .green : .orange)
+                Text("Commands work in Voice mode while the prompter is playing. If on-device recognition isn't available, enable Dictation in iOS Settings › General › Keyboard and download the language.")
+            }
         }
+    }
+}
+
+extension VoiceSettingsSection {
+    private var resolvedLocale: Locale {
+        settings.speechLocale == "auto" ? Locale.current : Locale(identifier: settings.speechLocale)
+    }
+    var onDevice: Bool { SFSpeechRecognizer(locale: resolvedLocale)?.supportsOnDeviceRecognition ?? false }
+    var onDeviceText: String {
+        let name = Locale.current.localizedString(forIdentifier: resolvedLocale.identifier) ?? resolvedLocale.identifier
+        return onDevice ? "On-device recognition available for \(name). Works offline, nothing leaves the phone."
+                        : "On-device recognition isn't available for \(name); Apple's servers may be used."
     }
 }
 

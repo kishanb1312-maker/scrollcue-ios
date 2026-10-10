@@ -264,6 +264,7 @@ struct PrompterScreen: View {
         if LaunchArgs.quick { showQuickSettings = true }
         if LaunchArgs.video { videoMode = true }
         if LaunchArgs.mirror { settingsStore.settings.mirrorHorizontal = true }
+        if LaunchArgs.unmirror { settingsStore.settings.mirrorHorizontal = false }
         if LaunchArgs.autoplay {
             settingsStore.settings.scrollMode = .constant
             settingsStore.settings.constantSpeed = 80

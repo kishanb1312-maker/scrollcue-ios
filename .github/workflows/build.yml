@@ -45,29 +45,41 @@ jobs:
           xcrun simctl privacy "$UDID" grant all "$BID" || true
 
           xcrun simctl launch "$UDID" "$BID"; sleep 6
+          xcrun simctl io "$UDID" screenshot shots/0-onboarding.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding; sleep 5
           xcrun simctl io "$UDID" screenshot shots/1-home.png
           xcrun simctl terminate "$UDID" "$BID" || true
 
-          xcrun simctl launch "$UDID" "$BID" -tabSettings; sleep 5
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding -tabSettings; sleep 5
           xcrun simctl io "$UDID" screenshot shots/2-settings.png
           xcrun simctl terminate "$UDID" "$BID" || true
 
-          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoAutoplay; sleep 4
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding -demoPrompter -demoAutoplay; sleep 4
           xcrun simctl io "$UDID" screenshot shots/3-prompter-a.png
           sleep 4
           xcrun simctl io "$UDID" screenshot shots/4-prompter-b.png
           xcrun simctl terminate "$UDID" "$BID" || true
 
-          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoQuick; sleep 5
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding -demoPrompter -demoQuick; sleep 5
           xcrun simctl io "$UDID" screenshot shots/5-quick-settings.png
           xcrun simctl terminate "$UDID" "$BID" || true
 
-          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoVideo; sleep 5
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding -demoPrompter -demoVideo; sleep 5
           xcrun simctl io "$UDID" screenshot shots/6-video-mode.png
           xcrun simctl terminate "$UDID" "$BID" || true
 
-          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoMirror; sleep 5
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding -demoPrompter -demoMirror; sleep 5
           xcrun simctl io "$UDID" screenshot shots/7-mirrored.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          # Landscape prompter
+          xcrun simctl launch "$UDID" "$BID" -skipOnboarding -demoPrompter -demoAutoplay -demoUnmirror
+          sleep 2
+          osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to keystroke (ASCII character 29) using command down' || true
+          sleep 4
+          xcrun simctl io "$UDID" screenshot shots/8-landscape.png
           # Still alive?
           xcrun simctl spawn "$UDID" launchctl list | grep -i scrollcue
           ALIVE=$?

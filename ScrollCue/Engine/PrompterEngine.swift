@@ -314,8 +314,16 @@ final class PrompterEngine: ObservableObject {
         lastTick = CACurrentMediaTime()
     }
 
+    private var lastWatchdog: CFTimeInterval = 0
+
     private func tick() {
         let now = CACurrentMediaTime()
+        if pipActive && now - lastWatchdog > 5 {
+            // Keep the floating prompter alive and listening if another app interrupted audio.
+            lastWatchdog = now
+            KeepAlive.shared.restartIfNeeded()
+            if isPlaying && settings.scrollMode != .constant && !mic.isRunning { startMicIfNeeded() }
+        }
         let dt = min(now - lastTick, 0.1)
         lastTick = now
 
