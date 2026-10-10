@@ -257,6 +257,11 @@ struct PrompterScreen: View {
         engine.onWordsSpoken = { [weak stats] n in stats?.addWords(n) }
         engine.onSessionEnded = { [weak stats] secs in stats?.addSession(seconds: secs) }
         engine.onMirrorCommand = { settingsStore.settings.mirrorHorizontal.toggle() }
+        if LaunchArgs.autoplay {
+            settingsStore.settings.scrollMode = .constant
+            settingsStore.settings.constantSpeed = 80
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { engine.play(skipCountdown: true) }
+        }
     }
 
     private func teardown() {

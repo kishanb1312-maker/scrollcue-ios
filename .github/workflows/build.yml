@@ -9,22 +9,60 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Xcode version
+      - name: Select newest Xcode
         run: |
-          ls -d /Applications/Xcode*.app
           LATEST=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
           sudo xcode-select -s "$LATEST"
           xcodebuild -version
-      - name: Build (device, unsigned)
+      - name: Build for device (unsigned)
         run: |
           set -o pipefail
           xcodebuild -project ScrollCue.xcodeproj -target ScrollCue -configuration Debug \
             -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build 2>&1 | tee build.log | grep -E "error:|warning: .*ScrollCue/|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" build.log
-      - name: Upload log
+      - name: Build for simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project ScrollCue.xcodeproj -target ScrollCue -configuration Debug \
+            -sdk iphonesimulator -arch arm64 CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee sim-build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" sim-build.log
+      - name: Simulator smoke test
+        run: |
+          set -x
+          mkdir -p shots
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print([x['udid'] for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone')][0])")
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          APP=build/Debug-iphonesimulator/ScrollCue.app
+          BID=com.kishanb1312.scrollcue
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl privacy "$UDID" grant all "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID"; sleep 6
+          xcrun simctl io "$UDID" screenshot shots/1-home.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID" -tabSettings; sleep 5
+          xcrun simctl io "$UDID" screenshot shots/2-settings.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+
+          xcrun simctl launch "$UDID" "$BID" -demoPrompter -demoAutoplay; sleep 4
+          xcrun simctl io "$UDID" screenshot shots/3-prompter-a.png
+          sleep 4
+          xcrun simctl io "$UDID" screenshot shots/4-prompter-b.png
+          # Still alive?
+          xcrun simctl spawn "$UDID" launchctl list | grep -i scrollcue
+          ALIVE=$?
+          ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i scrollcue && cp ~/Library/Logs/DiagnosticReports/*ScrollCue* shots/ || true
+          exit $ALIVE
+      - name: Upload logs and screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
-          path: build.log
+          name: build-output
+          path: |
+            build.log
+            sim-build.log
+            shots/

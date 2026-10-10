@@ -127,12 +127,14 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
 
     func engineDidUpdate() {
         let now = CACurrentMediaTime()
-        // ~30 fps is plenty for PiP and keeps the CPU cool.
-        if now - lastRender >= 1.0 / 30.0 {
+        // ~30 fps is plenty for PiP; while the window is closed we only keep
+        // the frame roughly current so it opens on the right line.
+        let interval = isActive ? 1.0 / 30.0 : 0.25
+        if now - lastRender >= interval {
             renderNow()
         } else if !pendingRender {
             pendingRender = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 30.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
                 self?.pendingRender = false
                 self?.renderNow()
             }

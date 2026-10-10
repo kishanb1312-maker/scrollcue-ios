@@ -18,17 +18,29 @@ struct ScrollCueApp: App {
     }
 }
 
+/// Launch arguments used by the CI simulator smoke test.
+enum LaunchArgs {
+    static let args = ProcessInfo.processInfo.arguments
+    static var openDemo: Bool { args.contains("-demoPrompter") }
+    static var autoplay: Bool { args.contains("-demoAutoplay") }
+    static var tab: Int { args.contains("-tabSettings") ? 1 : (args.contains("-tabStats") ? 2 : 0) }
+}
+
 struct RootView: View {
     @EnvironmentObject var stats: StatsStore
+    @State private var tab = LaunchArgs.tab
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             HomeView()
                 .tabItem { Label("Scripts", systemImage: "text.alignleft") }
+                .tag(0)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "slider.horizontal.3") }
+                .tag(1)
             StatsView()
                 .tabItem { Label("Stats", systemImage: "chart.bar") }
+                .tag(2)
         }
         .overlay(alignment: .top) {
             if let m = stats.milestone {

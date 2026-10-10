@@ -79,6 +79,11 @@ struct HomeView: View {
             .fullScreenCover(item: $launch) { script in
                 PrompterView(scriptID: script.id)
             }
+            .onAppear {
+                if LaunchArgs.openDemo, launch == nil, let first = scripts.scripts.first {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { launch = first }
+                }
+            }
         }
     }
 
