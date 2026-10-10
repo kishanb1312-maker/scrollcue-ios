@@ -111,7 +111,7 @@ struct Script: Codable, Identifiable, Equatable, Hashable {
 }
 
 enum DeviceInfo {
-    static var name: String { UIDevice.current.model }
+    static let name: String = ProcessInfo.processInfo.isiOSAppOnMac ? "Mac" : "iPhone"
 }
 
 final class ScriptStore: ObservableObject {

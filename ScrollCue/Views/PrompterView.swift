@@ -152,8 +152,9 @@ struct PrompterScreen: View {
 
     private var dock: some View {
         let items = settings.dockItems
-        let left = items.filter { [.restart, .sentenceBack].contains($0) }
-        let right = items.filter { ![.restart, .sentenceBack].contains($0) }
+        let leftSet: [DockItem] = [.restart, .sentenceBack]
+        let left = items.filter { leftSet.contains($0) }
+        let right = items.filter { !leftSet.contains($0) }
         return HStack(spacing: 4) {
             ForEach(left) { dockButton($0) }
             Spacer(minLength: 0)

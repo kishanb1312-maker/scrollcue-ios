@@ -1,5 +1,6 @@
 import AVFoundation
 import Speech
+import NaturalLanguage
 
 enum AudioSession {
     /// One shared configuration: record + play, mixing with other apps so the
@@ -69,7 +70,7 @@ enum Permissions {
 }
 
 /// Microphone input: level metering (sound mode) and speech recognition (voice mode).
-final class MicController {
+final class MicController: NSObject {
     var onLevel: ((Float) -> Void)?
     var onTranscript: (([String]) -> Void)?
     var onSegmentReset: (() -> Void)?
@@ -211,8 +212,6 @@ final class MicController {
         return Locale.current
     }
 }
-
-import NaturalLanguage
 
 enum LanguageDetector {
     static func dominantLanguage(of text: String) -> String? {

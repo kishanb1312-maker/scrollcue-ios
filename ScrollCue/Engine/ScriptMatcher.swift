@@ -95,7 +95,7 @@ struct VoiceCommands {
         func split(_ p: String) -> [String] {
             p.split(separator: " ").map { ScriptTokens.normalize(String($0)) }.filter { !$0.isEmpty }
         }
-        phrases = [
+        let all: [(Command, [String])] = [
             (.nextSentence, split(s.commandNextSentence)),
             (.previousSentence, split(s.commandPreviousSentence)),
             (.next, split(s.commandNext)),
@@ -103,7 +103,8 @@ struct VoiceCommands {
             (.start, split(s.commandStart)),
             (.finish, split(s.commandFinish)),
             (.mirror, split(s.commandMirror)),
-        ].filter { !$0.1.isEmpty }
+        ]
+        phrases = all.filter { !$0.1.isEmpty }
     }
 
     /// Finds a command whose phrase ends at the end of `spoken` (normalized words).

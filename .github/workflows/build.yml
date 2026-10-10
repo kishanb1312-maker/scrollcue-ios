@@ -11,7 +11,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Xcode version
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app || true
+          ls -d /Applications/Xcode*.app
+          LATEST=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$LATEST"
           xcodebuild -version
       - name: Build (device, unsigned)
         run: |
