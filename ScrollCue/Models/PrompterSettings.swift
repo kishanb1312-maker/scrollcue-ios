@@ -223,7 +223,7 @@ struct PrompterSettings: Codable, Equatable {
     var commandMirror: String = "mirror screen"
 
     // Picture in Picture
-    var pipStyle: PiPStyle = .player
+    var pipStyle: PiPStyle = .camera
     var pipShape: PiPShape = .landscape
     var pipFontSize: Double = 30
     var pipMargin: Double = 16
