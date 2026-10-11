@@ -307,6 +307,7 @@ struct SettingsView: View {
                 Section {
                     NavigationLink { PresetsView() } label: { Label("Presets", systemImage: "square.stack.3d.up") }
                     NavigationLink { TakesView() } label: { Label("Recordings", systemImage: "film.stack") }
+                    NavigationLink { BackTapHelpView() } label: { Label("Up/down over Camera (Back Tap)", systemImage: "hand.tap") }
                     NavigationLink { RemoteHelpView() } label: { Label("Keyboard & remote", systemImage: "keyboard") }
                 }
                 ScrollSettingsSection(settings: $store.settings)
@@ -535,5 +536,40 @@ struct StatsView: View {
     static func duration(_ s: Double) -> String {
         let m = Int(s) / 60
         return m < 60 ? "\(m) min" : "\(m / 60) h \(m % 60) min"
+    }
+}
+
+struct BackTapHelpView: View {
+    var body: some View {
+        List {
+            Section {
+                Text("The camera-friendly floating window can't have buttons, so ScrollCue gives you shortcut actions you can fire from the back of your iPhone, even while Camera, Instagram or TikTok is open.")
+            }
+            Section("1 · Create two shortcuts (once)") {
+                step(1, "Open the Shortcuts app and tap +.")
+                step(2, "Tap Add Action, search “ScrollCue” and pick Scroll Down.")
+                step(3, "Rename the shortcut “Prompter Down” and tap Done.")
+                step(4, "Repeat with Scroll Up and name it “Prompter Up”.")
+            }
+            Section("2 · Assign them to Back Tap") {
+                step(1, "Open Settings › Accessibility › Touch › Back Tap.")
+                step(2, "Double Tap → choose Prompter Down.")
+                step(3, "Triple Tap → choose Prompter Up.")
+            }
+            Section {
+                Text("Each tap moves the number of lines set under Floating prompter › Up/down buttons move N lines. iPhone 15 Pro and later can also map Scroll Down / Up or Play / Pause to the Action Button (Settings › Action Button › Shortcut).")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } header: {
+                Text("Tips")
+            }
+        }
+        .navigationTitle("Back Tap controls")
+    }
+
+    private func step(_ n: Int, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(n)").font(.headline).foregroundStyle(.yellow).frame(width: 18)
+            Text(text)
+        }
     }
 }

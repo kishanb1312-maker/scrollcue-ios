@@ -49,6 +49,9 @@ final class PrompterEngine: ObservableObject {
     /// True while the floating window is up: PiP then drives constant/sound scrolling.
     var pipActive = false { didSet { dirty = true } }
 
+    /// The prompter currently on screen, for Shortcut / Back Tap actions.
+    static weak var current: PrompterEngine?
+
     var onWordsSpoken: ((Int) -> Void)?
     var onMirrorCommand: (() -> Void)?
     var onSessionEnded: ((Double) -> Void)?
@@ -73,6 +76,7 @@ final class PrompterEngine: ObservableObject {
         }
         startTimer()
         updateProgress()
+        PrompterEngine.current = self
     }
 
     deinit {
