@@ -8,8 +8,12 @@ enum AudioSession {
     static func activate() {
         let session = AVAudioSession.sharedInstance()
         do {
+            // 0x4 = Bluetooth hands-free mic support. Written as a raw value because its
+            // Swift name changed in iOS 26 (allowBluetooth → allowBluetoothHFP); this
+            // compiles cleanly on every Xcode version.
+            let bluetoothHFP = AVAudioSession.CategoryOptions(rawValue: 0x4)
             try session.setCategory(.playAndRecord, mode: .default,
-                                    options: [.mixWithOthers, .allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
+                                    options: [.mixWithOthers, bluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
             try session.setActive(true)
         } catch {
             print("Audio session error: \(error)")
