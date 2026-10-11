@@ -256,6 +256,9 @@ struct PrompterScreen: View {
     private func setup() {
         UIApplication.shared.isIdleTimerDisabled = true
         AudioSession.activate()
+        // Start the background keep-alive now: iOS may refuse to start audio once
+        // the app is already on its way to the background (auto-start PiP).
+        KeepAlive.shared.start()
         pip.settings = settings
         pip.attach(engine: engine)
         engine.onWordsSpoken = { [weak stats] n in stats?.addWords(n) }

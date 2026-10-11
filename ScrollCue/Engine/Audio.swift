@@ -21,18 +21,47 @@ enum AudioSession {
     }
 }
 
-/// Plays silence so iOS keeps the app alive (and the PiP prompter scrolling)
-/// while another app is in front.
+/// Plays a looping silent track so iOS keeps the app running (and the PiP
+/// prompter scrolling and responding to its buttons) while another app,
+/// like Camera, is in front. Mixes with other audio, so it never interrupts
+/// anything.
 final class KeepAlive: NSObject {
     static let shared = KeepAlive()
-    private var engine: AVAudioEngine?
+    private var player: AVAudioPlayer?
     private var wanted = false
+
+    var isPlaying: Bool { player?.isPlaying ?? false }
 
     private override init() {
         super.init()
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(interruption(_:)), name: AVAudioSession.interruptionNotification, object: nil)
         nc.addObserver(self, selector: #selector(mediaReset), name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    }
+
+    func start() {
+        wanted = true
+        AudioSession.activate()
+        if player == nil {
+            player = try? AVAudioPlayer(data: Self.silentWAV(seconds: 2))
+            player?.numberOfLoops = -1
+            player?.volume = 0.01
+            player?.prepareToPlay()
+        }
+        if player?.isPlaying != true { player?.play() }
+    }
+
+    func stop() {
+        wanted = false
+        player?.stop()
+        player = nil
+    }
+
+    /// Called after interruptions (e.g. the Camera app grabbing audio) and by the PiP heartbeat.
+    func restartIfNeeded() {
+        guard wanted, player?.isPlaying != true else { return }
+        AudioSession.activate()
+        if player == nil { start() } else { player?.play() }
     }
 
     @objc private func interruption(_ note: Notification) {
@@ -43,47 +72,25 @@ final class KeepAlive: NSObject {
 
     @objc private func mediaReset() {
         DispatchQueue.main.async {
-            guard self.wanted else { return }
-            self.engine = nil
-            self.start()
+            self.player = nil
+            if self.wanted { self.start() }
         }
     }
 
-    func start() {
-        wanted = true
-        guard engine == nil else { restartIfNeeded(); return }
-        AudioSession.activate()
-        let engine = AVAudioEngine()
-        let format = engine.outputNode.inputFormat(forBus: 0)
-        let silence = AVAudioSourceNode(format: format) { _, _, _, buffers in
-            let list = UnsafeMutableAudioBufferListPointer(buffers)
-            for buffer in list {
-                if let data = buffer.mData { memset(data, 0, Int(buffer.mDataByteSize)) }
-            }
-            return noErr
-        }
-        engine.attach(silence)
-        engine.connect(silence, to: engine.mainMixerNode, format: format)
-        engine.mainMixerNode.outputVolume = 0
-        do {
-            try engine.start()
-            self.engine = engine
-        } catch {
-            print("KeepAlive failed: \(error)")
-        }
-    }
-
-    func stop() {
-        wanted = false
-        engine?.stop()
-        engine = nil
-    }
-
-    /// Called after interruptions (e.g. the Camera app grabbing audio) and by a watchdog.
-    func restartIfNeeded() {
-        guard wanted, let engine, !engine.isRunning else { return }
-        AudioSession.activate()
-        try? engine.start()
+    /// 16-bit mono PCM WAV of pure silence.
+    static func silentWAV(seconds: Double, sampleRate: Int = 22050) -> Data {
+        let samples = Int(Double(sampleRate) * seconds)
+        let dataSize = samples * 2
+        var d = Data()
+        func u32(_ v: UInt32) { var x = v.littleEndian; d.append(Data(bytes: &x, count: 4)) }
+        func u16(_ v: UInt16) { var x = v.littleEndian; d.append(Data(bytes: &x, count: 2)) }
+        d.append("RIFF".data(using: .ascii)!); u32(UInt32(36 + dataSize))
+        d.append("WAVE".data(using: .ascii)!)
+        d.append("fmt ".data(using: .ascii)!); u32(16); u16(1); u16(1)
+        u32(UInt32(sampleRate)); u32(UInt32(sampleRate * 2)); u16(2); u16(16)
+        d.append("data".data(using: .ascii)!); u32(UInt32(dataSize))
+        d.append(Data(count: dataSize))
+        return d
     }
 }
 

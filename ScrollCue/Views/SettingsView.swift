@@ -234,7 +234,12 @@ struct PiPSettingsSection: View {
         } header: {
             Text("Floating prompter (PiP)")
         } footer: {
-            Text("Tap the floating window once to show its controls. ⏪ scrolls UP, ⏩ scrolls DOWN, ⏯ plays and pauses. iOS doesn't let apps receive finger swipes inside a PiP window, so these buttons (plus voice, sound scrolling or a Bluetooth remote) are how you steer it.")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tap the floating window once to show its controls. ⏪ scrolls UP, ⏩ scrolls DOWN, ⏯ plays and pauses. iOS doesn't let apps receive finger swipes inside a PiP window, so these buttons (plus voice, sound scrolling or a Bluetooth remote) are how you steer it.")
+                if let diag = PiPDiagnostics.lastSummary {
+                    Text("Last PiP session: \(diag)").font(.caption2.monospaced())
+                }
+            }
         }
     }
 }

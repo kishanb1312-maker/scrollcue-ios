@@ -56,6 +56,7 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
 
     deinit {
         possibleObservation?.invalidate()
+        heartbeat?.cancel()
     }
 
     private func setupController() {
@@ -105,6 +106,30 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
 
     func stop() { controller?.stopPictureInPicture() }
 
+    // MARK: Heartbeat
+
+    /// While the floating window is up, re-render a few times a second even if
+    /// nothing moved, so a renderer that iOS reset in the background recovers.
+    private var heartbeat: DispatchSourceTimer?
+
+    private func startHeartbeat() {
+        heartbeat?.cancel()
+        let t = DispatchSource.makeTimerSource(queue: .main)
+        t.schedule(deadline: .now(), repeating: .milliseconds(250))
+        t.setEventHandler { [weak self] in
+            guard let self, self.isActive else { return }
+            KeepAlive.shared.restartIfNeeded()
+            if CACurrentMediaTime() - self.lastRender > 0.2 { self.renderNow() }
+        }
+        t.resume()
+        heartbeat = t
+    }
+
+    private func stopHeartbeat() {
+        heartbeat?.cancel()
+        heartbeat = nil
+    }
+
     // MARK: Rendering
 
     /// Size of the canvas in points before rotation.
@@ -145,10 +170,20 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
         lastRender = CACurrentMediaTime()
         ensureLayout()
         guard let buffer = makePixelBuffer(), let sample = makeSampleBuffer(from: buffer) else { return }
-        if displayLayer.status == .failed { displayLayer.flush() }
-        displayLayer.enqueue(sample)
+        let renderer = displayLayer.sampleBufferRenderer
+        // iOS revokes video resources when the app goes to the background, which
+        // leaves the renderer failed (black window, crossed-out play button).
+        // Flushing brings it back; the heartbeat makes sure we get here.
+        if renderer.status == .failed || renderer.requiresFlushToResumeDecoding {
+            renderer.flush()
+            PiPDiagnostics.shared.recoveries += 1
+        }
+        renderer.enqueue(sample)
+        PiPDiagnostics.shared.frameRendered(background: UIApplication.shared.applicationState != .active)
         if let tb = timebase, let engine {
             CMTimebaseSetTime(tb, time: CMTime(seconds: engine.progress * duration, preferredTimescale: 600))
+            // Keep the PiP clock's play state consistent with what we report to iOS.
+            CMTimebaseSetRate(tb, rate: engine.isPlaying ? 1 : 0)
         }
     }
 
@@ -306,6 +341,7 @@ extension PiPManager: AVPictureInPictureSampleBufferPlaybackDelegate {
             // ⏪ = scroll up, ⏩ = scroll down.
             let lines = max(self.settings.pipStepLines, 1)
             let direction = CMTimeGetSeconds(skipInterval) < 0 ? -1 : 1
+            PiPDiagnostics.shared.buttonPresses += 1
             self.engine?.moveLines(direction * lines, on: self)
             self.renderNow()
             completionHandler()
@@ -322,19 +358,21 @@ extension PiPManager: AVPictureInPictureControllerDelegate {
 
     func pictureInPictureControllerDidStartPictureInPicture(_ c: AVPictureInPictureController) {
         isActive = true
+        PiPDiagnostics.shared.sessionStarted()
+        startHeartbeat()
         engine?.pipActive = true
         c.invalidatePlaybackState()
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(_ c: AVPictureInPictureController) {
         isActive = false
+        stopHeartbeat()
+        PiPDiagnostics.shared.sessionEnded()
         engine?.pipActive = false
-        KeepAlive.shared.stop()
     }
 
     func pictureInPictureController(_ c: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         lastError = "Couldn't start Picture in Picture: \(error.localizedDescription)"
-        KeepAlive.shared.stop()
     }
 
     func pictureInPictureController(_ c: AVPictureInPictureController,
@@ -373,4 +411,43 @@ struct PiPHostView: UIViewRepresentable {
     func updateUIView(_ v: HostView, context: Context) {
         if v.hosted !== manager.displayLayer { v.hosted = manager.displayLayer }
     }
+}
+
+
+/// Lightweight counters from the last PiP session, shown in Settings so problems
+/// on a real device can be reported with numbers instead of guesses.
+final class PiPDiagnostics {
+    static let shared = PiPDiagnostics()
+
+    var frames = 0
+    var backgroundFrames = 0
+    var recoveries = 0
+    var buttonPresses = 0
+    private var started: Date?
+
+    func sessionStarted() {
+        frames = 0; backgroundFrames = 0; recoveries = 0; buttonPresses = 0
+        started = Date()
+    }
+
+    func frameRendered(background: Bool) {
+        guard started != nil else { return }
+        frames += 1
+        if background { backgroundFrames += 1 }
+        if frames % 60 == 0 { save() }
+    }
+
+    func sessionEnded() {
+        save()
+        started = nil
+    }
+
+    private func save() {
+        guard let started else { return }
+        let secs = Int(Date().timeIntervalSince(started))
+        let text = "\(secs)s · \(frames) frames (\(backgroundFrames) in background) · \(recoveries) recoveries · \(buttonPresses) button taps · keep-alive \(KeepAlive.shared.isPlaying ? "on" : "off")"
+        UserDefaults.standard.set(text, forKey: "scrollcue.pipDiagnostics")
+    }
+
+    static var lastSummary: String? { UserDefaults.standard.string(forKey: "scrollcue.pipDiagnostics") }
 }
