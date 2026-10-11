@@ -124,6 +124,18 @@ enum PiPShape: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum PiPStyle: String, Codable, CaseIterable, Identifiable {
+    case player, camera
+    var id: String { rawValue }
+    var label: String { self == .player ? "Player (⏪ ⏩ buttons)" : "Camera-friendly" }
+    var detail: String {
+        switch self {
+        case .player: return "Video-player window with ⏪ up / ⏩ down / ⏯ buttons. iOS may pause it while the Camera app is recording."
+        case .camera: return "Video-call style window that keeps running over Camera, Instagram and TikTok. No buttons: scroll with Voice, Sound, Constant or a remote."
+        }
+    }
+}
+
 enum VideoResolution: String, Codable, CaseIterable, Identifiable {
     case hd1080, uhd4K
     var id: String { rawValue }
@@ -211,6 +223,7 @@ struct PrompterSettings: Codable, Equatable {
     var commandMirror: String = "mirror screen"
 
     // Picture in Picture
+    var pipStyle: PiPStyle = .player
     var pipShape: PiPShape = .landscape
     var pipFontSize: Double = 30
     var pipMargin: Double = 16

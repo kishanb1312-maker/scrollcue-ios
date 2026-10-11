@@ -214,6 +214,10 @@ struct PiPSettingsSection: View {
 
     var body: some View {
         Section {
+            Picker("Window style", selection: $settings.pipStyle) {
+                ForEach(PiPStyle.allCases) { Text($0.label).tag($0) }
+            }
+            Text(settings.pipStyle.detail).font(.footnote).foregroundStyle(.secondary)
             Picker("Window shape", selection: $settings.pipShape) {
                 ForEach(PiPShape.allCases) { Text($0.label).tag($0) }
             }

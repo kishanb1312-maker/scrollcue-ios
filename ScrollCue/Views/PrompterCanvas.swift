@@ -11,8 +11,13 @@ struct RemoteActions {
 
 /// UIKit view that draws the script and handles drag, tap-to-jump and hardware keys.
 final class PrompterCanvasView: UIView, PrompterSurface {
+    /// False for the copy shown inside the camera-friendly PiP window, which is
+    /// driven by PiPManager instead of registering itself as a surface.
+    var registersWithEngine = true
+
     weak var engine: PrompterEngine? {
         didSet {
+            guard registersWithEngine else { return }
             oldValue?.unregister(self)
             if window != nil { engine?.register(self) }
         }
@@ -41,6 +46,7 @@ final class PrompterCanvasView: UIView, PrompterSurface {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        guard registersWithEngine else { return }
         if window != nil {
             engine?.register(self)
             DispatchQueue.main.async { self.becomeFirstResponder() }

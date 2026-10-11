@@ -23,12 +23,62 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
         didSet {
             guard settings != oldValue else { return }
             layout = nil
+            liveCanvas.settings = liveCanvasSettings
+            updateLiveSize()
+            if settings.pipStyle != oldValue.pipStyle && !isActive { setupController() }
             controller?.canStartPictureInPictureAutomaticallyFromInline = settings.pipAutoStart
             renderNow()
         }
     }
 
-    private(set) var layout: PrompterLayout?
+    /// Where the PiP window animates from; also anchors the camera-friendly style.
+    weak var sourceView: UIView? {
+        didSet { if sourceView !== oldValue, settings.pipStyle == .camera { setupController() } }
+    }
+
+    // MARK: Camera-friendly (video call) style
+
+    /// A live prompter view hosted in a video-call PiP window. iOS keeps this kind
+    /// of window running while the camera is in use, unlike video-player PiP.
+    private let callViewController = AVPictureInPictureVideoCallViewController()
+    private let liveCanvas: PrompterCanvasView = {
+        let v = PrompterCanvasView()
+        v.registersWithEngine = false
+        v.isUserInteractionEnabled = false
+        return v
+    }()
+    private var usingCameraStyle: Bool { controllerStyle == .camera }
+    private var controllerStyle: PiPStyle = .player
+
+    private var liveCanvasSettings: PrompterSettings {
+        var s = settings
+        s.fontSize = settings.pipFontSize
+        s.horizontalMargin = settings.pipMargin
+        s.activeLinePosition = settings.pipActiveLinePosition
+        s.mirrorHorizontal = settings.pipMirror
+        s.mirrorVertical = false
+        s.backgroundOpacity = 1
+        s.tapToJump = false
+        return s
+    }
+
+    private func updateLiveSize() {
+        let px = settings.pipShape.pixelSize
+        let size = CGSize(width: px.width / 2, height: px.height / 2)
+        callViewController.preferredContentSize = size
+        // Give the live canvas a real size before the window opens so it can lay out.
+        if callViewController.view.bounds.size != size {
+            callViewController.view.frame = CGRect(origin: .zero, size: size)
+            liveCanvas.frame = callViewController.view.bounds
+            liveCanvas.rebuildLayoutIfNeeded(force: true)
+        }
+    }
+
+    private var playerLayout: PrompterLayout?
+    var layout: PrompterLayout? {
+        get { usingCameraStyle ? liveCanvas.layout : playerLayout }
+        set { playerLayout = newValue }
+    }
     private var layoutText: String?
     private var pool: CVPixelBufferPool?
     private var poolSize: CGSize = .zero
@@ -38,7 +88,7 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
     /// Fake media duration; the PiP scrubber shows script progress across it.
     private let duration: Double = 600
 
-    var viewportHeight: CGFloat { canvasSize.height }
+    var viewportHeight: CGFloat { usingCameraStyle ? liveCanvas.bounds.height : canvasSize.height }
 
     override init() {
         super.init()
@@ -51,6 +101,11 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
             displayLayer.controlTimebase = tb
             timebase = tb
         }
+        liveCanvas.frame = callViewController.view.bounds
+        liveCanvas.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        callViewController.view.addSubview(liveCanvas)
+        callViewController.view.backgroundColor = .black
+        updateLiveSize()
         setupController()
     }
 
@@ -61,7 +116,16 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
 
     private func setupController() {
         guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
-        let source = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: displayLayer, playbackDelegate: self)
+        possibleObservation?.invalidate()
+        let source: AVPictureInPictureController.ContentSource
+        if settings.pipStyle == .camera {
+            // Needs a view in the window to anchor to; set up again once it exists.
+            guard let anchor = sourceView else { controller = nil; controllerStyle = .camera; return }
+            source = .init(activeVideoCallSourceView: anchor, contentViewController: callViewController)
+        } else {
+            source = .init(sampleBufferDisplayLayer: displayLayer, playbackDelegate: self)
+        }
+        controllerStyle = settings.pipStyle
         let c = AVPictureInPictureController(contentSource: source)
         c.delegate = self
         c.requiresLinearPlayback = false
@@ -76,11 +140,14 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
         self.engine = engine
         engine.pipSurface = self
         engine.pipActive = isActive
+        liveCanvas.engine = engine
+        liveCanvas.settings = liveCanvasSettings
         layout = nil
         renderNow()
     }
 
     func toggle() {
+        if controller == nil || controllerStyle != settings.pipStyle { setupController() }
         guard let controller else {
             lastError = "Picture in Picture isn't supported on this device."
             return
@@ -119,7 +186,12 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
         t.setEventHandler { [weak self] in
             guard let self, self.isActive else { return }
             KeepAlive.shared.restartIfNeeded()
-            if CACurrentMediaTime() - self.lastRender > 0.2 { self.renderNow() }
+            if self.usingCameraStyle {
+                self.liveCanvas.engineDidUpdate()
+                PiPDiagnostics.shared.frameRendered(background: UIApplication.shared.applicationState != .active)
+            } else if CACurrentMediaTime() - self.lastRender > 0.2 {
+                self.renderNow()
+            }
         }
         t.resume()
         heartbeat = t
@@ -151,6 +223,10 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
     }
 
     func engineDidUpdate() {
+        if usingCameraStyle {
+            liveCanvas.engineDidUpdate()
+            return
+        }
         let now = CACurrentMediaTime()
         // ~30 fps is plenty for PiP; while the window is closed we only keep
         // the frame roughly current so it opens on the right line.
@@ -168,6 +244,7 @@ final class PiPManager: NSObject, ObservableObject, PrompterSurface {
 
     func renderNow() {
         lastRender = CACurrentMediaTime()
+        if usingCameraStyle { liveCanvas.engineDidUpdate(); return }
         ensureLayout()
         guard let buffer = makePixelBuffer(), let sample = makeSampleBuffer(from: buffer) else { return }
         let renderer = displayLayer.sampleBufferRenderer
@@ -359,6 +436,7 @@ extension PiPManager: AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerDidStartPictureInPicture(_ c: AVPictureInPictureController) {
         isActive = true
         PiPDiagnostics.shared.sessionStarted()
+        PiPDiagnostics.shared.style = usingCameraStyle ? "camera-friendly" : "player"
         startHeartbeat()
         engine?.pipActive = true
         c.invalidatePlaybackState()
@@ -405,6 +483,7 @@ struct PiPHostView: UIViewRepresentable {
         let v = HostView()
         v.isUserInteractionEnabled = false
         v.hosted = manager.displayLayer
+        DispatchQueue.main.async { manager.sourceView = v }
         return v
     }
 
@@ -423,10 +502,12 @@ final class PiPDiagnostics {
     var backgroundFrames = 0
     var recoveries = 0
     var buttonPresses = 0
+    var interruptions = 0
+    var style = ""
     private var started: Date?
 
     func sessionStarted() {
-        frames = 0; backgroundFrames = 0; recoveries = 0; buttonPresses = 0
+        frames = 0; backgroundFrames = 0; recoveries = 0; buttonPresses = 0; interruptions = 0
         started = Date()
     }
 
@@ -445,7 +526,7 @@ final class PiPDiagnostics {
     private func save() {
         guard let started else { return }
         let secs = Int(Date().timeIntervalSince(started))
-        let text = "\(secs)s · \(frames) frames (\(backgroundFrames) in background) · \(recoveries) recoveries · \(buttonPresses) button taps · keep-alive \(KeepAlive.shared.isPlaying ? "on" : "off")"
+        let text = "\(style) · \(secs)s · \(frames) frames (\(backgroundFrames) in background) · \(recoveries) recoveries · \(buttonPresses) button taps · \(interruptions) audio interruptions · keep-alive \(KeepAlive.shared.isPlaying ? "on" : "off")"
         UserDefaults.standard.set(text, forKey: "scrollcue.pipDiagnostics")
     }
 

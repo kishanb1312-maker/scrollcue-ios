@@ -66,7 +66,11 @@ final class KeepAlive: NSObject {
 
     @objc private func interruption(_ note: Notification) {
         guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-              AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+        if type == .began {
+            DispatchQueue.main.async { PiPDiagnostics.shared.interruptions += 1 }
+            return
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.restartIfNeeded() }
     }
 
