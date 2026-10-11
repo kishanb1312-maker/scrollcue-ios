@@ -14,7 +14,7 @@ You need a Mac with **Xcode 16 or newer** and a USB cable (or Wi‑Fi pairing).
 
 1. Get the code:
    ```bash
-   git clone -b scrollcue-ios https://github.com/kishanb1312-maker/yt-content-os.git ScrollCue
+   git clone https://github.com/kishanb1312-maker/scrollcue-ios.git ScrollCue
    cd ScrollCue
    open ScrollCue.xcodeproj
    ```
@@ -103,13 +103,4 @@ ScrollCue/
   Camera/     capture session + recording
   Views/      SwiftUI screens
 Config/Info.plist   background audio mode (keeps PiP alive)
-```
-
-## Moving this to its own repo
-
-The app lives on the `scrollcue-ios` branch of `yt-content-os`. To give it a
-repo of its own, create an empty repo called `scrollcue-ios` on GitHub, then:
-
-```bash
-git push https://github.com/kishanb1312-maker/scrollcue-ios.git scrollcue-ios:main
 ```
